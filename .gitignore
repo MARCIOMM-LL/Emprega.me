@@ -1,0 +1,57 @@
+# Ignorar configurações sensíveis e tokens
+.env
+.env.local
+.env.*
+
+# Ignorar sessões e uploads
+sessions/
+uploads/
+tmp/
+*.log
+
+# Composer (se usares)
+vendor/
+composer.lock
+
+# Node (caso uses no frontend)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Ignorar ficheiros de cache do sistema
+*.cache
+*.log
+*.tmp
+
+# Ignorar IDEs
+.idea/
+.vscode/
+*.sublime-*
+
+# Ignorar backups
+*.bak
+*.old
+*.orig
+*.swp
+
+# Ignorar ficheiros ZIP e builds locais
+*.zip
+*.tar.gz
+*.rar
+
+# Ignorar testes locais e relatórios
+tests/_output/
+coverage/
+phpunit.xml
+
+# Ignorar bases de dados locais
+*.sqlite
+*.db
+*.sql
+
+# Ignorar dumps
+*.dump.sql
+*.sql.gz
+
+# Ignorar debug recaptcha (do teu código)
+debug_recaptcha.txt
