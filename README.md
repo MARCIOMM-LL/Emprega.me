@@ -141,6 +141,13 @@ Contribuições são bem-vindas! Abre uma issue ou faz um pull request.
 
 ---
 
+---
+
+## 🙋‍♂️ Sobre o Autor
+
+Desenvolvido por [Márcio Miranda](https://www.linkedin.com/in/developer1988/), entusiasta de desenvolvimento web com foco em **PHP moderno**, **microserviços** e **boas práticas de código limpo**.
+
+
 ## 📦 Licença
 
 Este projeto é de código aberto e está licenciado sob a Licença MIT.
