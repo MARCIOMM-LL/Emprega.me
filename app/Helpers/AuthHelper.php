@@ -14,7 +14,7 @@ class AuthHelper
     }
 
     /**
-     * Verifica se existe um utilizador logado (candidato ou empresa).
+     * Verifica se existe um candidato logado (candidato ou empresa).
      * Se o registo foi apagado da BD, faz logout automático.
      *
      * @param string $tipo 'candidato' ou 'empresa'
@@ -25,20 +25,20 @@ class AuthHelper
         self::startSession();
 
         if ($tipo === 'candidato') {
-            if (!isset($_SESSION['utilizador'])) {
+            if (!isset($_SESSION['candidato'])) {
                 return null;
             }
 
             $model = new Candidato();
-            $utilizador = $model->buscarPorId($_SESSION['utilizador']['id']);
+            $candidato = $model->buscarPorId($_SESSION['candidato']['id']);
 
-            if (!$utilizador) {
+            if (!$candidato) {
                 session_destroy();
                 header('Location: /dashboard');
                 exit;
             }
 
-            return $utilizador;
+            return $candidato;
         }
 
         if ($tipo === 'empresa') {
@@ -64,8 +64,8 @@ class AuthHelper
 
     public static function requireGuest()
     {
-        session_start();
-        if (isset($_SESSION['utilizador'])) {
+        self::startSession();
+        if (isset($_SESSION['candidato'])) {
             header('Location: /home');
             exit;
         }
@@ -73,8 +73,8 @@ class AuthHelper
 
     public static function requireLogin()
     {
-        session_start();
-        if (!isset($_SESSION['utilizador'])) {
+        self::startSession();
+        if (!isset($_SESSION['candidato'])) {
             header('Location: /login-candidato');
             exit;
         }

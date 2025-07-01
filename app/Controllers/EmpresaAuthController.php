@@ -1,10 +1,13 @@
 <?php
 namespace App\Controllers;
 
+use App\Helpers\EmailTemplateHelper;
+use App\Helpers\SessionHelper;
 use App\Models\Empresa;
 use App\Services\EmailService;
 use App\Helpers\CsrfHelper;
 use App\Helpers\FlashHelper;
+use DateTime;
 use GuzzleHttp\Client;
 use Dotenv\Dotenv;
 
@@ -12,8 +15,7 @@ class EmpresaAuthController
 {
     public function registerAjax(): void
     {
-        header('Content-Type: application/json');
-        session_start();
+        SessionHelper::start();
 
         $nome = trim($_POST['nome'] ?? '');
         $email = trim($_POST['email'] ?? '');
@@ -23,17 +25,14 @@ class EmpresaAuthController
         $tokenCSRF = $_POST['csrf_token'] ?? '';
         $recaptchaResponse = $_POST['g-recaptcha-response'] ?? '';
 
-        // CSRF
         if (!CsrfHelper::validarToken($tokenCSRF)) {
             $this->jsonResponse(false, 'Token CSRF inválido.');
         }
 
-        // Primeira validação: Se o reCAPTCHA veio preenchido
         if (empty($recaptchaResponse)) {
             $this->jsonResponse(false, 'Por favor, complete o reCAPTCHA.');
         }
 
-        // Garantir que o .env é carregado mesmo se o front controller falhar
         if (!isset($_ENV['NOCAPTCHA_SECRET'])) {
             $dotenv = Dotenv::createImmutable(__DIR__ . '/../../../');
             $dotenv->load();
@@ -41,15 +40,11 @@ class EmpresaAuthController
 
         $recaptchaSecret = $_ENV['NOCAPTCHA_SECRET'] ?? null;
         if (empty($recaptchaSecret)) {
-            echo json_encode(['success' => false, 'message' => 'Chave secreta reCAPTCHA não configurada no servidor.']);
-            return;
+            $this->jsonResponse(false, 'Chave secreta reCAPTCHA não configurada no servidor.');
         }
 
-        // Segunda validação: Verificar com o Google
         try {
             $client = new Client();
-            $recaptchaSecret = $_ENV['NOCAPTCHA_SECRET'] ?? null;
-
             $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
                 'form_params' => [
                     'secret' => $recaptchaSecret,
@@ -58,86 +53,63 @@ class EmpresaAuthController
                 ]
             ]);
 
-            // Salvar resposta crua do Google num ficheiro para debug
-            $bodyRaw = (string)$response->getBody();
-            file_put_contents(__DIR__ . '/../../debug_recaptcha.txt', $bodyRaw);
-
-            $body = json_decode($response->getBody(), true);
+            $body = json_decode((string)$response->getBody(), true);
 
             if (empty($body['success'])) {
-                echo json_encode(['success' => false, 'message' => 'Por favor, confirme o reCAPTCHA.']);
-                return;
+                $this->jsonResponse(false, 'Por favor, confirme o reCAPTCHA.');
             }
 
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro ao validar o reCAPTCHA.']);
-            return;
+            $this->jsonResponse(false, 'Erro ao validar o reCAPTCHA.');
         }
 
-        // Verificar igualdade dos emails
         if ($email !== $emailConfirmacao) {
             $this->jsonResponse(false, 'Os e-mails não coincidem.');
         }
 
-        // Verificar igualdade das senhas
         if ($senha !== $senhaConfirmacao) {
             $this->jsonResponse(false, 'As senhas não coincidem.');
         }
 
-        // Validar formato de email
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $this->jsonResponse(false, 'E-mail inválido.');
         }
 
-        // Regex de segurança de senha
         $regex = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/';
         if (!preg_match($regex, $senha)) {
-            $this->jsonResponse(false, 'A senha deve ter no mínimo 8 caracteres, 
-                                                         incluindo uma letra maiúscula, uma minúscula, 
-                                                         um número e um caractere especial.');
+            $this->jsonResponse(false, 'A senha deve ter no mínimo 8 caracteres, incluindo uma maiúscula, uma minúscula, um número e um símbolo.');
         }
 
         $model = new Empresa();
 
-        // Verificar se email já existe
         if ($model->emailExiste($email)) {
-            $this->jsonResponse(false, 'Este e-mail já está registado. 
-                                                         Por favor, faça login ou 
-                                                         recupere a senha.');
+            $this->jsonResponse(false, 'Este e-mail já está registado. Por favor, faça login ou recupere a senha.');
         }
 
-        // Criar token de confirmação
         $token = bin2hex(random_bytes(16));
 
         if ($model->criar($nome, $email, $senha, $token)) {
+            // Guardar o email na sessão para mostrar botão de reenviar
+            $_SESSION['email_empresa_para_confirmacao'] = $email;
+
+            $model = new \App\Models\Empresa();
+            $user = $model->buscarPorEmail($email); // 🔹 Buscar os dados do empresa
+
+            if (!$user) {
+                return; // Ou podes fazer log de erro se preferires
+            }
+
             $link = "http://localhost:8000/confirmar-empresa?token=$token";
 
-            $mensagem = "
-                <h1>Confirmação de Registo</h1>
-                <p>Olá {$nome},</p>
-                <p>Por favor, confirme o seu e-mail clicando no botão abaixo:</p>
-                <p>
-                    <a href='{$link}' style='
-                        display: inline-block;
-                        padding: 10px 20px;
-                        background-color: #28a745;
-                        color: white;
-                        text-decoration: none;
-                        border-radius: 5px;
-                        font-weight: bold;
-                    '>Confirmar Registo</a>
-                </p>
-                <p>Se não consegue clicar, copie e cole o link no navegador:</p>
-                <p>{$link}</p>
-            ";
+            $mensagem = EmailTemplateHelper::confirmacaoRegisto($link, $user['nome']);
 
-            EmailService::enviarEmail($email, 'Confirmação de Registo', $mensagem);
+            EmailService::enviarEmail($email, '[EMPRESA] Confirmação de Registo', $mensagem);
 
             $_SESSION['flash_type'] = 'info';
             $_SESSION['flash_message'] = 'Registo efetuado! Verifique o seu e-mail antes de fazer login.';
 
-            echo json_encode(['success' => true, 'redirect' => '/dashboard']);
-            exit;
+            $this->jsonResponse(true, 'Registo efetuado! Verifique o seu e-mail.', '/dashboard');
+
         } else {
             $this->jsonResponse(false, 'Erro ao criar conta. Por favor, tente novamente.');
         }
@@ -151,21 +123,32 @@ class EmpresaAuthController
         $user = $model->encontrarPorToken($token);
 
         if ($user) {
+            // NOVO: Evita múltiplos cliques no link do email
+            if ((int)$user['confirmado'] === 1) {
+                FlashHelper::set('info', 'A sua conta já foi confirmada anteriormente.');
+                header('Location: /dashboard');
+                exit;
+            }
+
+            // Verificar se o token expirou
+            if (!empty($user['token_expires_at']) && strtotime($user['token_expires_at']) < time()) {
+                FlashHelper::set('error', 'O link de confirmação expirou. Solicite um novo.');
+                header('Location: /dashboard');
+                exit;
+            }
+
             $model->confirmar($token);
 
-            // ✅ Enviar e-mail de boas-vindas para Empresa
-            $mensagem = "
-            <h1>Bem-vindo ao Emprega.me!</h1>
-            <p>Olá {$user['nome']},</p>
-            <p>A sua conta de empresa foi confirmada com sucesso.</p>
-            <p>Agora pode publicar vagas e encontrar candidatos para a sua empresa.</p>
-            <p>Obrigado por se juntar a nós!</p>
-        ";
-            EmailService::enviarEmail($user['email'], 'Bem-vindo ao Emprega.me!', $mensagem);
+            // Limpar email da sessão para esconder botão "reenviar"
+            unset($_SESSION['email_empresa_para_confirmacao']);
+
+            $mensagem = EmailTemplateHelper::contaConfirmada($user['nome']);
+            EmailService::enviarEmail($user['email'], '[EMPRESA] Bem-vindo ao Emprega.me!', $mensagem);
 
             FlashHelper::set('success', 'Conta confirmada com sucesso! Já pode fazer login.');
             header('Location: /dashboard');
             exit;
+
         } else {
             FlashHelper::set('error', 'Token inválido ou conta já confirmada anteriormente.');
             header('Location: /dashboard');
@@ -173,10 +156,100 @@ class EmpresaAuthController
         }
     }
 
+    public function verificarEmailSessaoEmpresa(): void
+    {
+        SessionHelper::start();
+
+        $email = $_SESSION['email_empresa_para_confirmacao'] ?? '';
+
+        if (!$email) {
+            echo json_encode(['success' => false, 'showButton' => false]);
+            exit;
+        }
+
+        $model = new \App\Models\Empresa();
+        $empresa = $model->buscarPorEmail($email);
+
+        if ($empresa && (int)$empresa['confirmado'] === 0) {
+            echo json_encode([
+                'success' => true,
+                'showButton' => true,
+                'email' => $email
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'showButton' => false]);
+        }
+    }
+
+    public function reenviarEmailConfirmacaoSessaoEmpresa(): void
+    {
+        SessionHelper::start();
+
+        $email = $_SESSION['email_empresa_para_confirmacao'] ?? '';
+
+        if (!$email) {
+            $this->jsonResponse(false, 'Email não disponível na sessão.');
+            return;
+        }
+
+        // ✅ PROTEÇÃO: tempo mínimo de 60 segundos entre reenvios
+        $ultimoEnvio = $_SESSION['ultimo_reenvio_confirmacao_empresa'] ?? 0;
+        if (time() - $ultimoEnvio < 60) {
+            $this->jsonResponse(false, 'Aguarde alguns segundos antes de reenviar o email.');
+            return;
+        }
+
+        $model = new \App\Models\Empresa();
+        $empresa = $model->buscarPorEmail($email);
+
+        if (!$empresa) {
+            $this->jsonResponse(false, 'Email não encontrado.', null, ['email_confirmado' => false]);
+            return;
+        }
+
+        if ((int)$empresa['confirmado'] === 1) {
+            $this->jsonResponse(false, 'Conta já confirmada. Faça o seu login.', null, ['email_confirmado' => true]);
+            return;
+        }
+
+        // Gerar novo token e expiração
+        $novoToken = bin2hex(random_bytes(16));
+        $novaExpiracao = (new DateTime())->modify('+24 hours')->format('Y-m-d H:i:s');
+
+        // Atualizar via model
+        $model->atualizarTokenConfirmacao($email, $novoToken, $novaExpiracao);
+
+        // Reenviar email com novo token
+        $this->enviarEmailConfirmacaoEmpresa($email, $novoToken);
+
+        // ✅ Guardar hora do último envio
+        $_SESSION['ultimo_reenvio_confirmacao_empresa'] = time();
+
+        $this->jsonResponse(true, 'Email de confirmação reenviado com sucesso.', null, ['email_confirmado' => false]);
+    }
+
+    private function enviarEmailConfirmacaoEmpresa(string $email, string $token): void
+    {
+        $model = new \App\Models\Empresa();
+        $user = $model->buscarPorEmail($email); // 🔹 Buscar os dados do empresa
+
+        if (!$user) {
+            return; // Ou podes fazer log de erro se preferires
+        }
+
+        $link = "http://localhost:8000/confirmar-empresa?token=$token";
+        $mensagem = EmailTemplateHelper::confirmacaoRegisto($link, $user['nome']);
+
+        EmailService::enviarEmail($email, '[EMPRESA] Confirmação de Registo', $mensagem);
+    }
+
     public function loginAjax(): void
     {
-        header('Content-Type: application/json');
-        session_start();
+        SessionHelper::start();
+
+        // 🔐 Preservar variáveis da sessão atual
+        $emailCandidatoConfirmacao = $_SESSION['email_candidato_para_confirmacao'] ?? null;
+        $emailEmpresaConfirmacao   = $_SESSION['email_empresa_para_confirmacao'] ?? null;
 
         $email = trim($_POST['email'] ?? '');
         $senha = $_POST['password'] ?? '';
@@ -186,12 +259,10 @@ class EmpresaAuthController
             $this->jsonResponse(false, 'Email e senha são obrigatórios.');
         }
 
-        // Primeira validação: Se o reCAPTCHA veio preenchido
         if (empty($recaptchaResponse)) {
             $this->jsonResponse(false, 'Por favor, complete o reCAPTCHA.');
         }
 
-        // Garantir que o .env é carregado mesmo se o front controller falhar
         if (!isset($_ENV['NOCAPTCHA_SECRET'])) {
             $dotenv = Dotenv::createImmutable(__DIR__ . '/../../../');
             $dotenv->load();
@@ -203,11 +274,8 @@ class EmpresaAuthController
             return;
         }
 
-        // Segunda validação: Verificar com o Google
         try {
             $client = new Client();
-            $recaptchaSecret = $_ENV['NOCAPTCHA_SECRET'] ?? null;
-
             $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
                 'form_params' => [
                     'secret' => $recaptchaSecret,
@@ -216,11 +284,9 @@ class EmpresaAuthController
                 ]
             ]);
 
-            // Salvar resposta crua do Google num ficheiro para debug
             $bodyRaw = (string)$response->getBody();
             file_put_contents(__DIR__ . '/../../debug_recaptcha.txt', $bodyRaw);
-
-            $body = json_decode($response->getBody(), true);
+            $body = json_decode($bodyRaw, true);
 
             if (empty($body['success'])) {
                 echo json_encode(['success' => false, 'message' => 'Por favor, confirme o reCAPTCHA.']);
@@ -236,13 +302,23 @@ class EmpresaAuthController
         $user = $model->verificarLogin($email, $senha);
 
         if ($user) {
-            $_SESSION['empresa'] = $user;
+            // ✅ Iniciar sessão limpa
+            session_unset();
+            session_destroy();
+            SessionHelper::start();
 
-            // Flash de sucesso
+            // 🔁 Restaurar variáveis anteriores
+            if ($emailCandidatoConfirmacao) {
+                $_SESSION['email_candidato_para_confirmacao'] = $emailCandidatoConfirmacao;
+            }
+            if ($emailEmpresaConfirmacao) {
+                $_SESSION['email_empresa_para_confirmacao'] = $emailEmpresaConfirmacao;
+            }
+
+            $_SESSION['empresa'] = $user;
             $_SESSION['flash_type'] = 'success';
             $_SESSION['flash_message'] = 'Login realizado com sucesso.';
 
-            // Enviar redirect no JSON
             echo json_encode(['success' => true, 'redirect' => '/dashboard']);
             exit;
         } else {
@@ -252,22 +328,31 @@ class EmpresaAuthController
 
     public function logout(): void
     {
-        session_start();
+        SessionHelper::start();
 
-        // Guardar flash antes de destruir a sessão
+        // 🔐 Preservar variáveis antes de destruir
+        $emailCandidatoConfirmacao = $_SESSION['email_candidato_para_confirmacao'] ?? null;
+        $emailEmpresaConfirmacao   = $_SESSION['email_empresa_para_confirmacao'] ?? null;
+
         $tipo = 'success';
         $mensagem = 'Logout realizado com sucesso.';
 
-        // Destruir a sessão completamente
+        // 🔄 Destruir sessão e reiniciar
         session_unset();
         session_destroy();
+        SessionHelper::start();
 
-        // Iniciar nova sessão apenas para guardar o flash
-        session_start();
+        // 🔁 Restaurar variáveis importantes
+        if ($emailCandidatoConfirmacao) {
+            $_SESSION['email_candidato_para_confirmacao'] = $emailCandidatoConfirmacao;
+        }
+        if ($emailEmpresaConfirmacao) {
+            $_SESSION['email_empresa_para_confirmacao'] = $emailEmpresaConfirmacao;
+        }
+
         $_SESSION['flash_type'] = $tipo;
         $_SESSION['flash_message'] = $mensagem;
 
-        // Redirecionar
         header('Location: /dashboard');
         exit;
     }
@@ -288,35 +373,35 @@ class EmpresaAuthController
 
     public function enviarLinkRecuperacao(): void
     {
-        header('Content-Type: application/json');
-        session_start();
+        SessionHelper::start();
 
         $email = trim($_POST['email'] ?? '');
         $tokenCSRF = $_POST['csrf_token'] ?? '';
         $recaptchaResponse = $_POST['g-recaptcha-response'] ?? '';
 
-        // Validar CSRF
-        if (!CsrfHelper::validarToken($tokenCSRF)) {
-            $this->jsonResponse(false, 'Token CSRF inválido.');
+        // ✅ BLOQUEIO de múltiplos envios seguidos (ex: 60 segundos)
+        $ultimoEnvio = $_SESSION['ultimo_envio_recuperacao'] ?? 0;
+        if (time() - $ultimoEnvio < 60) {
+            echo json_encode(['success' => false, 'message' => 'Aguarde alguns segundos antes de reenviar.']);
+            exit;
         }
 
-        // Validar se o reCAPTCHA foi preenchido
+        // Validar CSRF
+        if (!CsrfHelper::validarToken($tokenCSRF)) {
+            echo json_encode(['success' => false, 'message' => 'Token CSRF inválido.']);
+            exit;
+        }
+
         if (empty($recaptchaResponse)) {
             $this->jsonResponse(false, 'Por favor, complete o reCAPTCHA.');
         }
 
-        // Garantir que .env foi carregado
-        if (!isset($_ENV['NOCAPTCHA_SECRET'])) {
-            $dotenv = \Dotenv\Dotenv::createImmutable(__DIR__ . '/../../../');
-            $dotenv->load();
-        }
-
         $recaptchaSecret = $_ENV['NOCAPTCHA_SECRET'] ?? null;
         if (empty($recaptchaSecret)) {
-            $this->jsonResponse(false, 'Chave secreta reCAPTCHA não configurada no servidor.');
+            echo json_encode(['success' => false, 'message' => 'Chave secreta reCAPTCHA não configurada no servidor.']);
+            return;
         }
 
-        // Verificar com o Google
         try {
             $client = new Client();
 
@@ -331,40 +416,42 @@ class EmpresaAuthController
             $bodyRaw = (string)$response->getBody();
             file_put_contents(__DIR__ . '/../../debug_recaptcha.txt', $bodyRaw);
 
-            $body = json_decode($bodyRaw, true);
+            $body = json_decode($response->getBody(), true);
 
             if (empty($body['success'])) {
-                $this->jsonResponse(false, 'Por favor, confirme o reCAPTCHA.');
+                echo json_encode(['success' => false, 'message' => 'Por favor, confirme o reCAPTCHA.']);
+                return;
             }
 
         } catch (\Exception $e) {
-            $this->jsonResponse(false, 'Erro ao validar o reCAPTCHA.');
+            echo json_encode(['success' => false, 'message' => 'Erro ao validar o reCAPTCHA.']);
+            return;
         }
 
         $model = new Empresa();
         $user = $model->buscarPorEmail($email);
 
         if (!$user) {
-            $this->jsonResponse(false, 'Nenhuma conta encontrada com este e-mail.');
+            echo json_encode(['success' => false, 'message' => 'Conta inválida.']);
+            exit;
         }
 
-        // Gerar token e salvar
+        if ((int)$user['confirmado'] === 0) {
+            echo json_encode(['success' => false, 'message' => 'Conta inválida.']);
+            exit;
+        }
+
         $token = bin2hex(random_bytes(16));
         $model->salvarTokenRecuperacao($user['id'], $token);
 
-        // Montar link e mensagem
         $link = "http://localhost:8000/redefinir-senha-empresa?token=$token";
-        $mensagem = "
-            <h1>Recuperação de Senha</h1>
-            <p>Olá {$user['nome']},</p>
-            <p>Clique no link abaixo para criar uma nova senha:</p>
-            <p><a href='{$link}'>Redefinir Senha</a></p>
-            <p>Se você não solicitou esta recuperação, ignore este e-mail.</p>
-        ";
+        $mensagem = EmailTemplateHelper::recuperacaoSenha($user['nome'], $link);
 
-        EmailService::enviarEmail($email, 'Recuperação de Senha', $mensagem);
+        EmailService::enviarEmail($email, '[EMPRESA] Recuperação de Senha', $mensagem);
 
-        // Flash + Redirect via JSON
+        // ✅ Gravar o momento do envio para bloquear reenvios seguidos
+        $_SESSION['ultimo_envio_recuperacao'] = time();
+
         FlashHelper::set('success', 'Link de recuperação enviado! Verifique o seu e-mail.');
         echo json_encode(['success' => true, 'redirect' => '/dashboard']);
         exit;
@@ -372,7 +459,7 @@ class EmpresaAuthController
 
     public function processarNovaSenha(): void
     {
-        session_start();
+        SessionHelper::start();
 
         $token = $_POST['token'] ?? '';
         $senha = $_POST['senha'] ?? '';
@@ -408,25 +495,25 @@ class EmpresaAuthController
         }
 
         $model = new \App\Models\Empresa();
-        $user = $model->encontrarPorToken($token);
+        $user = $model->encontrarPorTokenRecuperacao($token);
 
-        if (!$user) {
-            FlashHelper::set('error', 'Token inválido ou expirado.');
+        if (
+            !$user ||
+            empty($user['token_recuperacao_expires_at']) ||
+            strtotime($user['token_recuperacao_expires_at']) < time()
+        ) {
+            FlashHelper::set('error', 'Token expirado ou inválido. Solicite um novo link.');
             header("Location: /dashboard");
             exit;
         }
 
         // Atualizar a senha no banco
         if ($model->atualizarSenhaPorToken($token, $senha)) {
-            // Enviar e-mail de sucesso
-            EmailService::enviarEmail($user['email'], 'Senha Alterada com Sucesso', "
-                <h1>Alteração de Senha</h1>
-                <p>Olá {$user['nome']},</p>
-                <p>A sua senha foi alterada com sucesso.</p>
-            ");
+
+            $mensagem = EmailTemplateHelper::senhaAlterada($user['nome']);
+            EmailService::enviarEmail($user['email'], '[EMPRESA] Senha alterada com sucesso', $mensagem);
 
             FlashHelper::set('success', 'Senha atualizada com sucesso! Faça login.');
-
             header('Location: /dashboard');
             exit;
         } else {
@@ -436,13 +523,21 @@ class EmpresaAuthController
         }
     }
 
-    private function jsonResponse(bool $success, string $message): void
+    private function jsonResponse(bool $success, string $message, string $redirect = null, array $extra = []): void
     {
-        header('Content-Type: application/json');
-        echo json_encode([
+        $response = [
             'success' => $success,
             'message' => $message
-        ]);
-        exit;
+        ];
+
+        if ($redirect !== null) {
+            $response['redirect'] = $redirect;
+        }
+
+        // Esta linha garante que `email_confirmado` (e outros) sejam incluídos
+        $response = array_merge($response, $extra);
+
+        \App\Helpers\ResponseHelper::json($response);
     }
+
 }

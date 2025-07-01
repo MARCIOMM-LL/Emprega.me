@@ -4,7 +4,7 @@ use App\Core\Router;
 $router = new Router();
 
 // Rota pública de dashboard (exemplo de rota web normal)
-//$router->get('', 'HomeController@index');
+$router->get('/api/csrf-token', 'CsrfController@token');
 $router->get('dashboard', 'HomeController@index');
 
 // API de autocomplete (exemplo de rota de API)
@@ -21,6 +21,11 @@ $router->get('logout-candidato', 'CandidatoAuthController@logout');
 // Endpoints AJAX para Candidato
 $router->post('api/login-candidato', 'CandidatoAuthController@loginAjax');
 $router->post('api/register-candidato', 'CandidatoAuthController@registerAjax');
+
+
+$router->post('auth/verificar-email-sessao-candidato', 'CandidatoAuthController@verificarEmailSessaoCandidato');
+$router->post('auth/reenviar-email-sessao-candidato', 'CandidatoAuthController@reenviarEmailConfirmacaoSessaoCandidato');
+
 
 // Recuperação de Senha - Candidato
 $router->post('api/recuperar-senha-candidato', 'CandidatoAuthController@enviarLinkRecuperacao');
@@ -43,6 +48,10 @@ $router->post('api/register-empresa', 'EmpresaAuthController@registerAjax');
 $router->post('api/recuperar-senha-empresa', 'EmpresaAuthController@enviarLinkRecuperacao');
 $router->get('redefinir-senha-empresa', 'EmpresaAuthController@formRedefinirSenha');
 $router->post('redefinir-senha-empresa', 'EmpresaAuthController@processarNovaSenha');
+
+
+$router->post('auth/verificar-email-sessao-empresa', 'EmpresaAuthController@verificarEmailSessaoEmpresa');
+$router->post('auth/reenviar-email-sessao-empresa', 'EmpresaAuthController@reenviarEmailConfirmacaoSessaoEmpresa');
 
 
 return $router;

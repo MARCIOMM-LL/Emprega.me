@@ -27,6 +27,7 @@ function fecharTodosOsModais() {
 // Funções abrir e fechar (Modais Candidato)
 function abrirModalLoginCandidato() {
     abrirModal('modalLoginCandidato');
+    inicializarBotaoReenviarEmail('#modalLoginCandidato .resend-section');
 }
 
 function fecharModalLoginCandidato() {
@@ -53,6 +54,7 @@ function fecharModalRecuperarSenhaCandidato() {
 // Funções abrir e fechar (Modais Empresa)
 function abrirModalLoginEmpresa() {
     abrirModal('modalLoginEmpresa');
+    inicializarBotaoReenviarEmail('#modalLoginEmpresa .resend-section');
 }
 
 function fecharModalLoginEmpresa() {
@@ -89,7 +91,12 @@ window.onclick = function(event) {
         fecharTodosOsModais();
     }
 }
+
 /*------------------------------- MODALS LOGIN E REGISTER "END SECTION" -------------------------------*/
+
+/*------------------------------- REQUEST AJAX OF REGISTER AND LOGIN "START SECTION" -------------------------------*/
+
+/*------------------------------- REQUEST AJAX OF REGISTER AND LOGIN "END SECTION" -------------------------------*/
 
 /*------------------------------- SEARCH FIELDS CITY AND PROFESSIONS "START SECTION" -------------------------------*/
 function configurarAutocomplete(idCampo, tabela_database) {
@@ -262,9 +269,3 @@ function isDoubleClicked(element) {
     return false;
 }
 /*------------------------------- MEDIA QUERIES NAVBAR "END SECTION" -------------------------------*/
-
-/*------------------------------- REQUEST AJAX OF REGISTER AND LOGIN "START SECTION" -------------------------------*/
-
-
-
-/*------------------------------- REQUEST AJAX OF REGISTER AND LOGIN "END SECTION" -------------------------------*/

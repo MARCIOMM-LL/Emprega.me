@@ -3,11 +3,7 @@
 use App\Helpers\FlashHelper;
 use App\Helpers\CsrfHelper;
 
-// Inicia a sessão se ainda não estiver iniciada (o próprio AuthHelper cuida disso se usado logo depois)
 session_start();
-
-// Flash Messages
-//$flash = FlashHelper::get();
 
 // Token CSRF
 $csrfToken = CsrfHelper::gerarToken();
@@ -16,6 +12,7 @@ $csrfToken = CsrfHelper::gerarToken();
 $userCandidato = \App\Helpers\AuthHelper::userOrLogout('candidato');
 $userEmpresa = \App\Helpers\AuthHelper::userOrLogout('empresa');
 
+// Flash Messages
 $flash = FlashHelper::get();
 ?>
 
@@ -163,11 +160,11 @@ $flash = FlashHelper::get();
                 </ul>
 
                 <ul class="sub-navbar-collapse sub-navbar-ml-auto white">
-                    <?php if (isset($_SESSION['utilizador']) || isset($_SESSION['empresa'])): ?>
+                    <?php if (isset($_SESSION['candidato']) || isset($_SESSION['empresa'])): ?>
                         <li class="dropdown">
                             <a class="nav-link" style="color: black; background: none; border: none; cursor: pointer;">
                                 <i class="fa fa-user-circle-o"></i>
-                                <?= isset($_SESSION['utilizador']) ? htmlspecialchars($_SESSION['utilizador']['nome']) :
+                                <?= isset($_SESSION['candidato']) ? htmlspecialchars($_SESSION['candidato']['nome']) :
                                                                      htmlspecialchars($_SESSION['empresa']['nome']); ?>
                             </a>
                             <ul class="dropdown-content">
@@ -657,11 +654,11 @@ $flash = FlashHelper::get();
                 </ul>
 
                 <ul class="ul-nav-lista ul-nav-2">
-                    <?php if (isset($_SESSION['utilizador']) || isset($_SESSION['empresa'])): ?>
+                    <?php if (isset($_SESSION['candidato']) || isset($_SESSION['empresa'])): ?>
                         <li style="margin-bottom:1.5rem!important;">
                             <a style="font-weight: bold; color: #374151; cursor: pointer;" class="links-navegacao">
                                 <i class="fa fa-user-circle-o"></i>
-                                <?= isset($_SESSION['utilizador']) ? htmlspecialchars($_SESSION['utilizador']['nome']) :
+                                <?= isset($_SESSION['candidato']) ? htmlspecialchars($_SESSION['candidato']['nome']) :
                                                                      htmlspecialchars($_SESSION['empresa']['nome']); ?>
                             </a>
 
@@ -717,13 +714,13 @@ $flash = FlashHelper::get();
 <div id="modalLoginCandidato" class="modal">
     <div class="modal-content">
         <!-- Botão Fechar -->
-        <button type="button" class="fechar" onclick="fecharModalLoginCandidato()">&times;</button>
+        <button type="button" class="fechar" onclick="fecharModalLoginCandidato()" data-prevent-click>&times;</button>
 
         <h2>Login de Candidato</h2>
 
         <form id="formLoginCandidato" method="POST" action="/api/login-candidato" autocomplete="off">
             <!-- CSRF -->
-            <input type="hidden" name="csrf_token" value="<?= CsrfHelper::gerarToken(); ?>">
+            <input type="hidden" name="csrf_token" value="<?= CsrfHelper::gerarToken(); ?>" data-prevent-click>
 
             <!-- Email -->
             <div class="form-group">
@@ -739,7 +736,15 @@ $flash = FlashHelper::get();
             <div id="recaptcha-login-candidato" class="recaptcha-container"></div>
 
             <!-- Botão Login -->
-            <button type="submit" class="btn btn-primary">LOGIN</button>
+            <button type="submit" class="btn btn-primary" data-prevent-click>LOGIN</button>
+
+            <!-- Botão Reenviar Email -->
+            <div class="resend-section" data-user-type="candidato" style="display: none; margin-top: 10px;">
+                <button class="btn-resend-email btn btn-warning btn-sm" type="button" data-prevent-click>
+                    Reenviar email de confirmação Candidato
+                </button>
+                <p class="resend-message" style="margin-top: 5px; font-size: 0.9em;"></p>
+            </div>
 
             <!-- Área de Mensagem AJAX -->
             <div id="loginMensagemCandidato" style="margin-top: 10px;"></div>
@@ -769,17 +774,19 @@ $flash = FlashHelper::get();
 <!-- Modal Registo Candidato -->
 <div id="modalRegisterCandidato" class="modal">
     <div class="modal-content">
-        <button type="button" class="button voltar" onclick="fecharModalRegisterCandidato(); abrirModalLoginCandidato();">
+        <button type="button" class="button voltar" onclick="fecharModalRegisterCandidato(); abrirModalLoginCandidato();" data-prevent-click>
             <i class="fa fa-arrow-left"></i>
         </button>
 
-        <button type="button" class="button fechar" onclick="fecharModalRegisterCandidato()">
+        <button type="button" class="button fechar" onclick="fecharModalRegisterCandidato()" data-prevent-click>
             <i class="fas fa-times-circle"></i>
         </button>
 
         <h2>Registo de Candidato</h2>
 
         <form id="formRegisterCandidato" method="POST" action="/api/register-candidato" >
+
+            <!-- CSRF Token -->
             <input type="hidden" name="csrf_token" value="<?= CsrfHelper::gerarToken(); ?>">
 
             <!-- Nome -->
@@ -813,7 +820,7 @@ $flash = FlashHelper::get();
             <!-- reCAPTCHA -->
             <div id="recaptcha-register-candidato" class="recaptcha-container"></div>
 
-            <button type="submit" class="btn btn-success">REGISTAR</button>
+            <button type="submit" class="btn btn-success" data-prevent-click>REGISTAR</button>
 
             <!-- Local para mensagens AJAX -->
             <div id="registerMensagemCandidato"></div>
@@ -826,7 +833,7 @@ $flash = FlashHelper::get();
     <div class="modal-content-senha">
 
         <!-- Botão Fechar -->
-        <button type="button" class="fechar" onclick="fecharModalRecuperarSenhaCandidato()">&times;</button>
+        <button type="button" class="fechar" onclick="fecharModalRecuperarSenhaCandidato()" data-prevent-click>&times;</button>
 
         <h2>Recuperar Senha - Candidato</h2>
 
@@ -844,7 +851,7 @@ $flash = FlashHelper::get();
             <div id="recaptcha-recuperar-candidato" class="recaptcha-container"></div>
 
             <!-- Botão -->
-            <button type="submit" class="btn btn-primary">Enviar link de recuperação</button>
+            <button type="submit" class="btn btn-primary" data-prevent-click>Enviar link de recuperação</button>
 
             <!-- Mensagens AJAX (Sucesso ou Erro) -->
             <div id="mensagemRecuperarSenhaCandidato" style="margin-top: 10px;"></div>
@@ -857,7 +864,7 @@ $flash = FlashHelper::get();
 <div id="modalLoginEmpresa" class="modal">
     <div class="modal-content">
         <!-- Botão Fechar -->
-        <button type="button" class="fechar" onclick="fecharModalLoginEmpresa()">&times;</button>
+        <button type="button" class="fechar" onclick="fecharModalLoginEmpresa()" data-prevent-click>&times;</button>
 
         <h2>Login de Empresa</h2>
 
@@ -879,7 +886,15 @@ $flash = FlashHelper::get();
             <div id="recaptcha-login-empresa" class="recaptcha-container"></div>
 
             <!-- Botão Login -->
-            <button type="submit" class="btn btn-primary">LOGIN</button>
+            <button type="submit" class="btn btn-primary" data-prevent-click>LOGIN</button>
+
+            <!-- Botão Reenviar Email - Empresa -->
+            <div class="resend-section" data-user-type="empresa" style="display: none; margin-top: 10px;">
+                <button class="btn-resend-email btn btn-warning btn-sm" type="button" data-prevent-click>
+                    Reenviar email de confirmação Empresa
+                </button>
+                <p class="resend-message" style="margin-top: 5px; font-size: 0.9em;"></p>
+            </div>
 
             <!-- Mensagem AJAX -->
             <div id="loginMensagemEmpresa" style="margin-top: 10px;"></div>
@@ -909,17 +924,19 @@ $flash = FlashHelper::get();
 <!-- Modal Registo Empresa -->
 <div id="modalRegisterEmpresa" class="modal">
     <div class="modal-content">
-        <button type="button" class="button voltar" onclick="fecharModalRegister(); abrirModalLogin();">
+        <button type="button" class="button voltar" onclick="fecharModalRegisterEmpresa(); abrirModalLoginEmpresa();" data-prevent-click>
             <i class="fa fa-arrow-left"></i>
         </button>
 
-        <button type="button" class="button fechar" onclick="fecharModalRegisterEmpresa()">
+        <button type="button" class="button fechar" onclick="fecharModalRegisterEmpresa()" data-prevent-click>
             <i class="fas fa-times-circle"></i>
         </button>
 
         <h2>Registo de Empresa</h2>
 
         <form id="formRegisterEmpresa" method="POST" action="/api/register-empresa">
+
+            <!-- CSRF Token -->
             <input type="hidden" name="csrf_token" value="<?= CsrfHelper::gerarToken(); ?>">
 
             <!-- Nome -->
@@ -953,7 +970,7 @@ $flash = FlashHelper::get();
             <!-- reCAPTCHA -->
             <div id="recaptcha-register-empresa" class="recaptcha-container"></div>
 
-            <button type="submit" class="btn btn-success">REGISTAR</button>
+            <button type="submit" class="btn btn-success" data-prevent-click>REGISTAR</button>
 
             <!-- Mensagem AJAX -->
             <div id="registerMensagemEmpresa"></div>
@@ -964,10 +981,12 @@ $flash = FlashHelper::get();
 <!-- Modal Recuperar Senha Empresa -->
 <div id="modalRecuperarSenhaEmpresa" class="modal">
     <div class="modal-content-senha">
-        <button type="button" class="fechar" onclick="fecharModalRecuperarSenhaEmpresa()">&times;</button>
+        <button type="button" class="fechar" onclick="fecharModalRecuperarSenhaEmpresa()" data-prevent-click>&times;</button>
         <h2>Recuperar Senha - Empresa</h2>
 
         <form id="formRecuperarSenhaEmpresa" method="POST" action="/api/recuperar-senha-empresa">
+
+            <!-- CSRF Token -->
             <input type="hidden" name="csrf_token" value="<?= \App\Helpers\CsrfHelper::gerarToken(); ?>">
 
             <div class="form-group">
@@ -977,7 +996,7 @@ $flash = FlashHelper::get();
             <!-- reCAPTCHA -->
             <div id="recaptcha-recuperar-empresa" class="recaptcha-container"></div>
 
-            <button type="submit" class="btn btn-primary">ENVIAR LINK DE RECUPERAÇÃO</button>
+            <button type="submit" class="btn btn-primary" data-prevent-click>ENVIAR LINK DE RECUPERAÇÃO</button>
 
             <div id="mensagemRecuperarSenhaEmpresa"></div>
         </form>
@@ -1026,7 +1045,6 @@ $flash = FlashHelper::get();
         }
     }
 
-    // Função AJAX reutilizável com suporte a reCAPTCHA
     function ajaxFormWithRecaptcha(formId, endpoint, mensagemDivId, onSuccess = null) {
         const form = document.getElementById(formId);
         const mensagemDiv = document.getElementById(mensagemDivId);
@@ -1035,14 +1053,27 @@ $flash = FlashHelper::get();
             if (typeof grecaptcha !== 'undefined') {
                 clearInterval(waitForRecaptcha);
 
+                let redirecionando = false;
+
                 form.addEventListener('submit', async function (e) {
                     e.preventDefault();
 
+                    const submitBtn = form.querySelector('[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerText = 'A processar...';
+                    }
+
                     const formData = new FormData(this);
+
                     const recaptchaResponse = grecaptcha.getResponse(recaptchaWidgets[formId]);
 
                     if (!recaptchaResponse) {
-                        mensagemDiv.innerHTML = '<span style="color:red;">Por favor, complete o reCAPTCHA.</span>';
+                        mostrarMensagemComFade(mensagemDiv, 'Por favor, complete o reCAPTCHA.', 'red');
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = 'Submeter';
+                        }
                         return;
                     }
 
@@ -1055,70 +1086,240 @@ $flash = FlashHelper::get();
                         });
 
                         const textResponse = await response.text();
-
                         let data;
+
                         try {
                             data = JSON.parse(textResponse);
                         } catch (jsonError) {
                             console.error('Resposta não é JSON válido:', textResponse);
-                            mensagemDiv.innerHTML = '<span style="color:red;">Resposta inválida do servidor.</span>';
+                            mostrarMensagemComFade(mensagemDiv, 'Resposta inválida do servidor.', 'red');
                             grecaptcha.reset(recaptchaWidgets[formId]);
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.innerText = 'Submeter';
+                            }
                             return;
                         }
 
-                        if (data.success) {
-                            if (data.redirect) {
-                                window.location.href = data.redirect;
-                                return;
-                            }
-
-                            if (data.message) {
-                                mensagemDiv.innerHTML = '<span style="color:green;">' + data.message + '</span>';
-                            } else {
-                                mensagemDiv.innerHTML = '';
-                            }
-
-                            if (onSuccess) onSuccess(data);
-
-                            form.reset();
-                            grecaptcha.reset(recaptchaWidgets[formId]);
-                        } else {
-                            // Cria mensagem com fade-out garantido
-                            const span = document.createElement('span');
-                            span.className = 'msg-auto-hide';
-                            span.textContent = data.message;
-                            span.style.color = 'red';
-                            span.style.opacity = '0'; // começa invisível
-                            span.style.transition = 'opacity 0.5s ease';
-
+                        if (data.success && data.redirect) {
+                            redirecionando = true;
                             mensagemDiv.innerHTML = '';
-                            mensagemDiv.appendChild(span);
-
-                            // Forçar reflow + fade-in
-                            setTimeout(() => {
-                                span.style.opacity = '1';
-
-                                // Após 4s, fade-out
-                                setTimeout(() => {
-                                    span.classList.add('fade-out');
-
-                                    setTimeout(() => {
-                                        mensagemDiv.innerHTML = '';
-                                    }, 500);
-                                }, 4000);
-                            }, 10);
-
                             grecaptcha.reset(recaptchaWidgets[formId]);
+                            window.location.href = data.redirect;
+                            return;
                         }
+
+                        const mensagem = data.message || 'Erro inesperado.';
+                        const cor = data.success ? 'green' : 'red';
+
+                        const ignorarMensagens = [
+                            'aguarde alguns segundos',
+                            'confirme o recaptcha',
+                            'por favor, complete o recaptcha'
+                        ];
+
+                        const deveOcultarMensagem =
+                            formId.includes('RecuperarSenha') ||
+                            formId.includes('RegisterCandidato') ||
+                            formId.includes('RegisterEmpresa');
+
+                        const deveMostrarMensagem = !ignorarMensagens.some(fragmento =>
+                            mensagem.toLowerCase().includes(fragmento)
+                        );
+
+                        if (!deveOcultarMensagem || deveMostrarMensagem) {
+                            mostrarMensagemComFade(mensagemDiv, mensagem, cor);
+                        }
+
+                        if (data.success) {
+                            if (onSuccess) onSuccess(data);
+                            form.reset();
+                        }
+
+                        grecaptcha.reset(recaptchaWidgets[formId]);
+
                     } catch (error) {
                         console.error('Erro no fetch:', error);
-                        mensagemDiv.innerHTML = '<span style="color:red;">Erro ao comunicar com o servidor.</span>';
+                        if (!redirecionando) {
+                            mostrarMensagemComFade(mensagemDiv, 'Erro ao comunicar com o servidor.', 'red');
+                        }
                         grecaptcha.reset(recaptchaWidgets[formId]);
+
+                    } finally {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = 'Submeter';
+                        }
                     }
                 });
             }
         }, 300);
     }
+
+    function mostrarMensagemComFade(container, texto, cor = 'red') {
+        const span = document.createElement('span');
+        span.className = 'msg-auto-hide';
+        span.textContent = texto;
+        span.style.color = cor;
+        span.style.borderColor = cor;
+        span.style.opacity = '0';
+        span.style.transition = 'opacity 0.4s ease';
+        span.style.backgroundColor = cor === 'green'
+            ? 'rgba(0, 128, 0, 0.08)'
+            : 'rgba(255, 0, 0, 0.08)';
+        span.style.padding = '8px';
+        span.style.display = 'inline-block';
+        span.style.marginTop = '10px';
+        span.style.borderRadius = '5px';
+        span.style.textAlign = 'center';
+        span.style.width = '100%';
+
+        container.innerHTML = '';
+        container.appendChild(span);
+
+        requestAnimationFrame(() => {
+            span.style.opacity = '1';
+
+            setTimeout(() => {
+                span.style.opacity = '0';
+
+                span.addEventListener('transitionend', () => {
+                    container.innerHTML = '';
+                }, { once: true });
+
+            }, 4000);
+        });
+    }
+
+    function iniciarCooldown(botao, textoOriginal, segundos) {
+        let tempoRestante = segundos;
+
+        botao.disabled = true;
+        botao.innerText = `Reenviar (${tempoRestante}s)`;
+
+        const intervalo = setInterval(() => {
+            tempoRestante--;
+            botao.innerText = `Reenviar (${tempoRestante}s)`;
+
+            if (tempoRestante <= 0) {
+                clearInterval(intervalo);
+                botao.disabled = false;
+                botao.innerText = textoOriginal;
+            }
+        }, 1000);
+    }
+
+    // Reenviar email ( Empresa/Candidato )
+    document.addEventListener('DOMContentLoaded', function () {
+        // ================================
+        // Ativar AJAX com reCAPTCHA
+        // ================================
+        ajaxFormWithRecaptcha(
+            'formRecuperarSenhaCandidato',
+            '/api/recuperar-senha-candidato',
+            'mensagemRecuperarSenhaCandidato'
+        );
+
+        ajaxFormWithRecaptcha(
+            'formRegisterCandidato',
+            '/api/register-candidato',
+            'registerMensagemCandidato'
+        );
+
+        ajaxFormWithRecaptcha(
+            'formRegisterEmpresa',
+            '/api/register-empresa',
+            'registerMensagemEmpresa'
+        );
+    });
+
+    function inicializarBotaoReenviarEmail(sectionSelector) {
+        const section = document.querySelector(sectionSelector);
+        if (!section) return;
+
+        const resendBtn = section.querySelector('.btn-resend-email');
+        const resendMessage = section.querySelector('.resend-message');
+        const userType = section.dataset.userType || 'candidato';
+
+        const verificarURL = userType === 'empresa'
+            ? '/auth/verificar-email-sessao-empresa'
+            : '/auth/verificar-email-sessao-candidato';
+
+        const reenviarURL = userType === 'empresa'
+            ? '/auth/reenviar-email-sessao-empresa'
+            : '/auth/reenviar-email-sessao-candidato';
+
+        fetch(verificarURL, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                section.style.display = 'block';
+                if (data.email_confirmado === true || data.showButton === false) {
+                    resendBtn.style.display = 'none';
+                } else {
+                    resendBtn.style.display = 'inline-block';
+                }
+
+                if (data.message) {
+                    mostrarMensagemComFade(resendMessage, data.message, 'red');
+                }
+            })
+            .catch(() => {
+                section.style.display = 'none';
+            });
+
+        resendBtn.addEventListener('click', function () {
+            const originalText = resendBtn.innerText;
+            resendBtn.disabled = true;
+            resendBtn.innerText = 'A processar...';
+            resendMessage.innerHTML = '';
+
+            fetch(reenviarURL, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    const cor = data.success ? 'green' : 'red';
+                    mostrarMensagemComFade(resendMessage, data.message || 'Erro ao reenviar.', cor);
+
+                    if (data.email_confirmado === true) {
+                        resendBtn.style.display = 'none';
+                        section.style.display = 'none'; // ✅ Aqui está a correção!
+                    } else {
+                        iniciarCooldown(resendBtn, originalText, 60);
+                    }
+                })
+                .catch(() => {
+                    mostrarMensagemComFade(resendMessage, 'Erro ao reenviar email.', 'red');
+                    resendBtn.disabled = false;
+                    resendBtn.innerText = originalText;
+                });
+        }, { once: true });
+    }
+
+    function abrirModalLoginEmpresa() {
+        abrirModal('modalLoginEmpresa'); // ✅ Usa a função genérica que fecha os outros modais
+        inicializarBotaoReenviarEmail('#modalLoginEmpresa .resend-section');
+    }
+
+    function abrirModalLoginCandidato() {
+        abrirModal('modalLoginCandidato'); // ✅ Usa a função genérica que fecha os outros modais
+        inicializarBotaoReenviarEmail('#modalLoginCandidato .resend-section');
+    }
+
+    function atualizarCsrfToken(formSelector) {
+        fetch('/api/csrf-token')
+            .then(res => res.json())
+            .then(data => {
+                if (data.token) {
+                    const form = document.querySelector(formSelector);
+                    if (form) {
+                        const input = form.querySelector('input[name="csrf_token"]');
+                        if (input) input.value = data.token;
+                    }
+                }
+            });
+    }
+
+
+
 
 
     // -----------------------------
